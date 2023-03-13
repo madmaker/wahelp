@@ -1,0 +1,74 @@
+##
+## Для локальной разработки
+##
+
+version: '3.5'
+
+services:
+  # nginx container as front controller
+  nginx:
+    container_name: ${PROJECT_NAME}-nginx
+    build:
+      context: dockerfiles/nginx
+      dockerfile: Dockerfile
+      args:
+        WORKDIR: ${WORKDIR}
+        EXPOSE_PORT_ARG: ${NGINX_PORT}
+    restart: unless-stopped
+    volumes:
+      - ./backend/public:/var/www/public:rw
+      - ./dockerfiles/nginx/logs:/var/log/nginx
+      - ./dockerfiles/nginx/sites-enabled:/etc/nginx/ext/sites-enabled/
+      - ./dockerfiles/nginx/nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - bridge-network
+
+  # main backend container
+  backend:
+    container_name: ${PROJECT_NAME}-backend
+    build:
+      context: .
+      dockerfile: ./dockerfiles/php-8.1/Dockerfile
+      args:
+        LOCAL_USER: ${LOCAL_USER}
+        WORKDIR: ${WORKDIR}
+        OPCACHE_ENABLE: 0
+        XDEBUG_ENABLE: 1
+    environment:
+      OPCACHE_ENABLE: 0
+      PHP_OPCACHE_ENABLE: 0
+      PHP_OPCACHE_CLI_ENABLE: 0
+    volumes:
+      - ./backend:/var/www
+    depends_on:
+      - postgresql
+    networks:
+      - bridge-network
+
+  # postgres container as main database
+  postgresql:
+    container_name: ${PROJECT_NAME}-postgresql
+    image: postgres:latest
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASS}
+      POSTGRES_USER: ${POSTGRES_USER}
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+    networks:
+      - bridge-network
+
+volumes:
+  postgresql-data:
+    name: ${PROJECT_NAME}-postgres-data
+    external: true
+
+networks:
+  bridge-network:
+    name: ${PROJECT_NAME}-network
+    driver: bridge
